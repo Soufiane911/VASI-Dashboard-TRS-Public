@@ -15,6 +15,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- 1.5 INITIALISATION SESSION STATE ---
+if 'sidebar_always_open' not in st.session_state:
+    st.session_state.sidebar_always_open = True
+
 # --- 2. CSS PERSONNALISÉ ---
 st.markdown("""
 <style>
@@ -37,15 +41,14 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* Cacher le header Streamlit par défaut */
+    /* Header visible pour garder la flèche de la sidebar */
     header {
-        visibility: hidden;
-        height: 0px;
+        visibility: visible;
     }
 
     /* Enlever les marges par défaut de Streamlit */
     .block-container {
-        padding-top: 0rem;
+        padding-top: 3rem;
         padding-bottom: 2rem;
         max-width: 1400px;
     }
@@ -256,6 +259,9 @@ if uploaded_files:
 
         # --- 6. AFFICHAGE PRINCIPAL ---
 
+        # Message d'aide - si sidebar fermée
+        st.info("💡 **Astuce:** Si la barre latérale est fermée, cliquez sur la flèche **>** en haut à gauche pour la rouvrir et accéder aux filtres.", icon="ℹ️")
+
         # HEADER - 5 KPIs circulaires
         col_spacer1, kpi1, kpi2, kpi3, kpi4, kpi5, col_spacer2 = st.columns([0.5, 1, 1, 1, 1, 1, 0.5])
 
@@ -371,7 +377,7 @@ else:
     # Ecran d'accueil vide
     st.markdown("""
     <div style='text-align: center; padding: 50px; color: #888;'>
-        <h2>Application Prête</h2>
-        <p>Veuillez importer vos fichiers ERP via le menu latéral gauche.</p>
+        <h2>📋 Application TRS Audit Dashboard</h2>
+        <p style='font-size: 16px;'>Bienvenue dans l'outil d'audit du Taux de Rendement Synthétique.</p>
     </div>
     """, unsafe_allow_html=True)
