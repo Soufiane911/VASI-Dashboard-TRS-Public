@@ -51,3 +51,6 @@ uploads/
 
 # Logs
 *.log
+
+# Documentation
+README.md
