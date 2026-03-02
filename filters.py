@@ -142,6 +142,41 @@ def calculate_filter_stats(df: pd.DataFrame, filters: dict) -> dict:
     }
 
 
+def calculate_filtered_stats(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> dict:
+    """
+    Calcule les statistiques sur les données FILTRÉES.
+    Les stats "totales" restent sur les données originales,
+    mais les compteurs (lignes à 0, OK, anomalies) reflètent le filtre appliqué.
+    
+    Args:
+        filtered_df: DataFrame après application des filtres
+        original_df: DataFrame original avant filtrage
+        
+    Returns:
+        dict avec les statistiques actualisées selon les filtres
+    """
+    total_rows = len(original_df)
+    filtered_rows = len(filtered_df)
+
+    # Compteurs sur les données FILTRÉES (actualisés selon les filtres)
+    filtered_zero_trs_count = filtered_df["is_zero_trs"].sum() if "is_zero_trs" in filtered_df.columns else 0
+    filtered_anomaly_count = filtered_df["is_anomaly"].sum() if "is_anomaly" in filtered_df.columns else 0
+    filtered_ok_count = filtered_rows - filtered_anomaly_count
+
+    return {
+        "total_rows": total_rows,
+        "filtered_rows": filtered_rows,
+        "excluded_rows": total_rows - filtered_rows,
+        # Stats sur données filtrées (actualisées)
+        "filtered_zero_trs_count": int(filtered_zero_trs_count),
+        "filtered_anomaly_count": int(filtered_anomaly_count),
+        "filtered_ok_count": int(filtered_ok_count),
+        # Stats sur données originales (pour référence si besoin)
+        "total_zero_trs_count": int(original_df["is_zero_trs"].sum() if "is_zero_trs" in original_df.columns else 0),
+        "total_anomaly_count": int(original_df["is_anomaly"].sum() if "is_anomaly" in original_df.columns else 0),
+    }
+
+
 def calculate_monthly_trs_table(df: pd.DataFrame) -> pd.DataFrame:
     """Calcule TRS Réel et TRS ERP par mois."""
     if df.empty or "Mois" not in df.columns:

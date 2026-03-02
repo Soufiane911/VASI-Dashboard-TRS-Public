@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from io import BytesIO
 
-from parser import parse_file, HEADER_ROWS_TO_SKIP
+from parser import parse_uploaded_file, HEADER_ROWS_TO_SKIP
 from calculator import calculate_all_metrics
 from filters import apply_filters, calculate_aggregated_kpis, calculate_monthly_trs_table, calculate_filter_stats
 from exporter import export_to_excel
@@ -168,13 +168,10 @@ with st.sidebar:
 # --- 5. LOGIQUE PRINCIPALE ---
 if uploaded_files:
     try:
-        # A. Parsing
+        # A. Parsing (utilisation de parser.py avec support chunks)
         all_dfs = []
         for uploaded_file in uploaded_files:
-            if uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file, sheet_name='RESULTAT_EQUIPE', header=HEADER_ROWS_TO_SKIP)
-            else:
-                df = pd.read_csv(uploaded_file, sep=';', header=HEADER_ROWS_TO_SKIP, decimal=',', encoding='latin-1')
+            df = parse_uploaded_file(uploaded_file)
             all_dfs.append(df)
 
         raw_df = pd.concat(all_dfs, ignore_index=True)
@@ -232,17 +229,18 @@ if uploaded_files:
         # D. Filtrage et KPIs
         filtered_df = apply_filters(processed_df, filter_config)
         kpis = calculate_aggregated_kpis(filtered_df)
-        stats = calculate_filter_stats(processed_df, filter_config)
+        # Stats calculées sur les données FILTRÉES (pas sur les données brutes)
+        stats = calculate_filtered_stats(filtered_df, processed_df)
         monthly_df = calculate_monthly_trs_table(filtered_df)
 
-        # E. Stats dans sidebar
+        # E. Stats dans sidebar (actualisées selon les filtres)
         with stats_placeholder:
             st.markdown("#### Stats")
             st.text(f"Lignes totales:    {stats['total_rows']}")
             st.text(f"Lignes affichées:  {stats['filtered_rows']}")
-            st.text(f"Lignes à 0:        {stats['zero_trs_count']}")
-            st.text(f"Lignes OK:         {stats['ok_count']}")
-            st.text(f"Anomalies:         {stats['anomaly_count']}")
+            st.text(f"Lignes à 0:        {stats['filtered_zero_trs_count']}")
+            st.text(f"Lignes OK:         {stats['filtered_ok_count']}")
+            st.text(f"Anomalies:         {stats['filtered_anomaly_count']}")
 
         # F. Bouton Export Excel
         with st.sidebar:
