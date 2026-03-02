@@ -1,6 +1,7 @@
 """
 Interface Streamlit pour le mapping des colonnes.
 """
+from typing import Dict
 import streamlit as st
 import pandas as pd
 from column_mapper import ColumnMapper, REQUIRED_COLUMNS, suggest_column_mappings
