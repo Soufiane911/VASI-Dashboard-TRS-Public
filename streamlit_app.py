@@ -272,8 +272,8 @@ if uploaded_files:
             st.markdown("#### Stats")
             st.text(f"Lignes totales:    {stats['total_rows']}")
             st.text(f"Lignes affichées:  {stats['filtered_rows']}")
-            st.text(f"Lignes à 0:        {stats['zero_trs_count']}")
-            st.text(f"Lignes OK:         {stats['ok_count']}")
+            st.text(f"Actives (TRS>0):   {stats['active_count']}")
+            st.text(f"À 0 (TRS=0):       {stats['zero_trs_count']}")
             st.text(f"Anomalies:         {stats['anomaly_count']}")
 
         # F. Bouton Export Excel
@@ -304,8 +304,8 @@ if uploaded_files:
         with kpi3:
             st.markdown(create_circle_kpi(kpis['écart_points'], "Écart"), unsafe_allow_html=True)
         with kpi4:
-            ok_pct = stats['ok_percentage'] / 100
-            st.markdown(create_circle_kpi(ok_pct, "% Lignes OK"), unsafe_allow_html=True)
+            active_pct = stats['ok_percentage'] / 100
+            st.markdown(create_circle_kpi(active_pct, "% Lignes Actives"), unsafe_allow_html=True)
         with kpi5:
             nok_pct = stats['anomaly_percentage'] / 100
             st.markdown(create_circle_kpi(nok_pct, "% Lignes NOK"), unsafe_allow_html=True)

@@ -145,8 +145,7 @@ def calculate_filter_stats(df: pd.DataFrame, filters: dict) -> dict:
 def calculate_filtered_stats(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> dict:
     """
     Calcule les statistiques sur les données FILTRÉES.
-    Les stats "totales" restent sur les données originales,
-    mais les compteurs (lignes à 0, OK, anomalies) reflètent le filtre appliqué.
+    Présentation simple: Actives / À 0 / Anomalies
     
     Args:
         filtered_df: DataFrame après application des filtres
@@ -159,24 +158,23 @@ def calculate_filtered_stats(filtered_df: pd.DataFrame, original_df: pd.DataFram
     filtered_rows = len(filtered_df)
 
     # Compteurs sur les données FILTRÉES (actualisés selon les filtres)
-    zero_trs_count = filtered_df["is_zero_trs"].sum() if "is_zero_trs" in filtered_df.columns else 0
-    anomaly_count = filtered_df["is_anomaly"].sum() if "is_anomaly" in filtered_df.columns else 0
-    ok_count = filtered_rows - anomaly_count
+    zero_trs_count = int(filtered_df["is_zero_trs"].sum() if "is_zero_trs" in filtered_df.columns else 0)
+    anomaly_count = int(filtered_df["is_anomaly"].sum() if "is_anomaly" in filtered_df.columns else 0)
     
-    # Pourcentages (compatibilité avec streamlit_app.py)
-    ok_percentage = (ok_count / filtered_rows * 100) if filtered_rows > 0 else 0
-    anomaly_percentage = (anomaly_count / filtered_rows * 100) if filtered_rows > 0 else 0
+    # Lignes actives = TRS > 0 (exclut les lignes à 0)
+    active_count = filtered_rows - zero_trs_count
 
     return {
         "total_rows": total_rows,
         "filtered_rows": filtered_rows,
         "excluded_rows": total_rows - filtered_rows,
-        # Stats sur données filtrées (actualisées) - noms sans prefix pour compatibilité
-        "zero_trs_count": int(zero_trs_count),
-        "anomaly_count": int(anomaly_count),
-        "ok_count": int(ok_count),
-        "ok_percentage": ok_percentage,
-        "anomaly_percentage": anomaly_percentage,
+        # Stats sur données filtrées (présentation simple)
+        "active_count": active_count,           # Lignes avec TRS > 0
+        "zero_trs_count": zero_trs_count,       # Lignes avec TRS = 0
+        "anomaly_count": anomaly_count,         # Lignes avec anomalies
+        # Pourcentages pour les KPIs circulaires
+        "ok_percentage": (active_count / filtered_rows * 100) if filtered_rows > 0 else 0,
+        "anomaly_percentage": (anomaly_count / filtered_rows * 100) if filtered_rows > 0 else 0,
     }
 
 
