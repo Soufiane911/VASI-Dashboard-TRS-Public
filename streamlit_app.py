@@ -7,6 +7,8 @@ from parser import parse_uploaded_file, HEADER_ROWS_TO_SKIP
 from calculator import calculate_all_metrics
 from filters import apply_filters, calculate_aggregated_kpis, calculate_monthly_trs_table, calculate_filter_stats, calculate_filtered_stats
 from exporter import export_to_excel
+from column_mapper import ColumnMapper, suggest_column_mappings, REQUIRED_COLUMNS
+from mapping_ui import render_mapping_interface, show_mapping_summary
 
 # --- 1. CONFIGURATION DE LA PAGE ---
 st.set_page_config(
@@ -167,13 +169,25 @@ with st.sidebar:
 
 # --- 5. FONCTIONS CACHEES (Optimisation Performance) ---
 @st.cache_data
-def load_and_process_files(uploaded_files_data):
+def apply_column_mapping_cached(raw_df: pd.DataFrame, mapping_json: str) -> pd.DataFrame:
     """
-    Charge et traite les fichiers uploadés avec support chunks.
+    Applique le mapping des colonnes (version cachée).
+    """
+    import json
+    mapping = json.loads(mapping_json)
+    mapper = ColumnMapper()
+    return mapper.apply_mapping(raw_df, mapping)
+
+
+def load_and_process_files(uploaded_files_data, column_mappings=None):
+    """
+    Charge et traite les fichiers uploadés avec support chunks et mapping intelligent.
     Cette fonction est mise en cache pour éviter de relire les fichiers
     à chaque interaction avec les filtres.
     """
     all_dfs = []
+    all_mappings = column_mappings or {}
+    
     for file_data in uploaded_files_data:
         file_name = file_data['name']
         file_content = file_data['content']
@@ -189,6 +203,12 @@ def load_and_process_files(uploaded_files_data):
         
         mock_file = MockUploadedFile(file_name, file_content)
         df = parse_uploaded_file(mock_file)
+        
+        # Appliquer le mapping si disponible
+        if file_name in all_mappings:
+            mapper = ColumnMapper()
+            df = mapper.apply_mapping(df, all_mappings[file_name])
+        
         all_dfs.append(df)
 
     raw_df = pd.concat(all_dfs, ignore_index=True)
@@ -209,14 +229,52 @@ if uploaded_files:
     try:
         # A. Préparation des données pour le cache (conversion en bytes)
         uploaded_files_data = []
+        column_mappings = {}
+        
         for uploaded_file in uploaded_files:
+            file_content = uploaded_file.getvalue()
+            
+            # Détection du mapping pour chaque fichier
+            mapper = ColumnMapper()
+            
+            # Parser le fichier temporairement pour détecter les colonnes
+            class TempUploadedFile:
+                def __init__(self, name, content):
+                    self.name = name
+                    self._content = content
+                def getvalue(self):
+                    return self._content
+            
+            temp_df = parse_uploaded_file(TempUploadedFile(uploaded_file.name, file_content))
+            
+            # Vérifier si le fichier utilise déjà les noms standard
+            standard_cols = set(REQUIRED_COLUMNS.keys())
+            file_cols = set(temp_df.columns)
+            missing_standard = standard_cols - file_cols
+            
+            # Si des colonnes standard sont manquantes, proposer le mapping
+            if len(missing_standard) > len(standard_cols) * 0.3:  # Plus de 30% manquantes
+                st.subheader(f"🗺️ Mapping requis pour: {uploaded_file.name}")
+                mapping = render_mapping_interface(temp_df, uploaded_file.name)
+                
+                if mapping is None:
+                    st.stop()  # Attendre que l'utilisateur configure le mapping
+                else:
+                    column_mappings[uploaded_file.name] = mapping
+                    show_mapping_summary(mapping)
+            else:
+                # Mapping auto ou fichier déjà compatible
+                suggestion = suggest_column_mappings(temp_df, mapper)
+                if suggestion["confidence"] > 0.8:
+                    column_mappings[uploaded_file.name] = suggestion["detected_mapping"]
+            
             uploaded_files_data.append({
                 'name': uploaded_file.name,
-                'content': uploaded_file.getvalue()
+                'content': file_content
             })
         
-        # B. Chargement et traitement (avec cache + parser chunks)
-        processed_df = load_and_process_files(uploaded_files_data)
+        # B. Chargement et traitement (avec cache + parser chunks + mapping)
+        processed_df = load_and_process_files(uploaded_files_data, column_mappings)
 
         # C. Filtres Avancés (après import)
         with st.sidebar:
