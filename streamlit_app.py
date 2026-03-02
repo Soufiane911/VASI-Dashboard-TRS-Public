@@ -165,27 +165,51 @@ with st.sidebar:
     # Section Stats (après import)
     stats_placeholder = st.container()
 
-# --- 5. LOGIQUE PRINCIPALE ---
+# --- 5. FONCTIONS CACHEES (Optimisation Performance) ---
+@st.cache_data
+def load_and_process_files(uploaded_files_data):
+    """
+    Charge et traite les fichiers uploadés.
+    Cette fonction est mise en cache pour éviter de relire les fichiers
+    à chaque interaction avec les filtres.
+    """
+    all_dfs = []
+    for file_data in uploaded_files_data:
+        file_name = file_data['name']
+        file_content = file_data['content']
+        
+        if file_name.endswith('.xlsx'):
+            df = pd.read_excel(BytesIO(file_content), sheet_name='RESULTAT_EQUIPE', header=HEADER_ROWS_TO_SKIP)
+        else:
+            df = pd.read_csv(BytesIO(file_content), sep=';', header=HEADER_ROWS_TO_SKIP, decimal=',', encoding='latin-1')
+        all_dfs.append(df)
+
+    raw_df = pd.concat(all_dfs, ignore_index=True)
+
+    if "Début Equipe" in raw_df.columns:
+        raw_df["Mois"] = pd.to_datetime(raw_df["Début Equipe"], errors="coerce").dt.to_period("M").astype(str)
+    else:
+        raw_df["Mois"] = "Inconnu"
+
+    # Calculs métriques (une seule fois)
+    processed_df = calculate_all_metrics(raw_df)
+    
+    return processed_df
+
+
+# --- 6. LOGIQUE PRINCIPALE ---
 if uploaded_files:
     try:
-        # A. Parsing
-        all_dfs = []
+        # A. Préparation des données pour le cache (conversion en bytes)
+        uploaded_files_data = []
         for uploaded_file in uploaded_files:
-            if uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file, sheet_name='RESULTAT_EQUIPE', header=HEADER_ROWS_TO_SKIP)
-            else:
-                df = pd.read_csv(uploaded_file, sep=';', header=HEADER_ROWS_TO_SKIP, decimal=',', encoding='latin-1')
-            all_dfs.append(df)
-
-        raw_df = pd.concat(all_dfs, ignore_index=True)
-
-        if "Début Equipe" in raw_df.columns:
-            raw_df["Mois"] = pd.to_datetime(raw_df["Début Equipe"], errors="coerce").dt.to_period("M").astype(str)
-        else:
-            raw_df["Mois"] = "Inconnu"
-
-        # B. Calculs
-        processed_df = calculate_all_metrics(raw_df)
+            uploaded_files_data.append({
+                'name': uploaded_file.name,
+                'content': uploaded_file.getvalue()
+            })
+        
+        # B. Chargement et traitement (avec cache)
+        processed_df = load_and_process_files(uploaded_files_data)
 
         # C. Filtres Avancés (après import)
         with st.sidebar:

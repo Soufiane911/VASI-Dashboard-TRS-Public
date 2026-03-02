@@ -54,3 +54,6 @@ uploads/
 
 # Documentation
 README.md
+
+.agent
+.gitignore

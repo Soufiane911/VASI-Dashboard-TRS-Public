@@ -151,62 +151,52 @@ def calculate_metrics_for_row(row: pd.Series) -> dict:
 
 
 def calculate_trs_réel_nf60182(df: pd.DataFrame) -> pd.DataFrame:
-    """Calcule le TRS Calculé selon la norme NF E60-182."""
+    """Calcule le TRS Calculé selon la norme NF E60-182 - VERSION VECTORISÉE."""
     df = df.copy()
 
-    # ===== CALCUL LIGNE PAR LIGNE =====
-    for idx, row in df.iterrows():
-        # Extraction des valeurs
-        tps_requis_h = _get_tps_requis_h(row)
-        tps_fct_brut_h = row.get("Tps Fct Brut (h)", 0.0) or 0.0
-        nb_cycles = row.get("Nb Cycles", 0) or 0
-        cycle_theo = row.get("Cycle Théo", 0) or 0
-        pieces_bonnes = row.get("Qté Pieces Bonnes", 0) or 0
-        pieces_fab = row.get("Qté Pieces Fab.", 1) or 1
-        trs_erp = row.get("T.R.S.", 0.0) or 0.0
+    # ===== EXTRACTION VECTORISÉE DES COLONNES =====
+    tps_fct_brut_h = df.get("Tps Fct Brut (h)", pd.Series([0.0] * len(df), index=df.index)).fillna(0.0)
+    nb_cycles = df.get("Nb Cycles", pd.Series([0] * len(df), index=df.index)).fillna(0)
+    cycle_theo = df.get("Cycle Théo", pd.Series([0] * len(df), index=df.index)).fillna(0)
+    pieces_bonnes = df.get("Qté Pieces Bonnes", pd.Series([0] * len(df), index=df.index)).fillna(0)
+    pieces_fab = df.get("Qté Pieces Fab.", pd.Series([1] * len(df), index=df.index)).fillna(1)
+    trs_erp = df.get("T.R.S.", pd.Series([0.0] * len(df), index=df.index)).fillna(0.0)
+    
+    # Calcul vectorisé du temps requis
+    tps_requis_h = df.apply(_get_tps_requis_h, axis=1).values
 
-        # ===== Disponibilité (Do) =====
-        if tps_requis_h > 0:
-            do_réel = tps_fct_brut_h / tps_requis_h
-        else:
-            do_réel = 0.0
+    # ===== DISPONIBILITÉ (Do) - VECTORISÉ =====
+    do_réel = np.where(tps_requis_h > 0, tps_fct_brut_h / tps_requis_h, 0.0)
 
-        # ===== Performance (Tp) =====
-        if tps_fct_brut_h > 0 and cycle_theo > 0:
-            tps_net_h = (nb_cycles * cycle_theo) / 3600
-            tp_réel = tps_net_h / tps_fct_brut_h
-        else:
-            tp_réel = 0.0
+    # ===== PERFORMANCE (Tp) - VECTORISÉ =====
+    tps_net_h = (nb_cycles * cycle_theo) / 3600
+    tp_réel = np.where((tps_fct_brut_h > 0) & (cycle_theo > 0), tps_net_h / tps_fct_brut_h, 0.0)
 
-        # ===== Qualité (Tq) =====
-        pieces_bonnes_abs = abs(pieces_bonnes)
-        if pieces_fab > 0:
-            tq_réel = pieces_bonnes_abs / pieces_fab
-        else:
-            tq_réel = 0.0
+    # ===== QUALITÉ (Tq) - VECTORISÉ =====
+    pieces_bonnes_abs = np.abs(pieces_bonnes)
+    tq_réel = np.where(pieces_fab > 0, pieces_bonnes_abs / pieces_fab, 0.0)
 
-        # ===== TRS Audit =====
-        trs_réel = do_réel * tp_réel * tq_réel
+    # ===== TRS AUDIT - VECTORISÉ =====
+    trs_réel = do_réel * tp_réel * tq_réel
 
-        # Nettoyer les Inf et NaN
-        if np.isnan(trs_réel) or np.isinf(trs_réel):
-            trs_réel = 0.0
+    # Nettoyer les Inf et NaN
+    trs_réel = np.where(np.isnan(trs_réel) | np.isinf(trs_réel), 0.0, trs_réel)
 
-        # Limiter à 1.5 pour éviter les valeurs absurdes
-        trs_réel = max(0.0, min(trs_réel, 1.5))
+    # Limiter à 1.5 pour éviter les valeurs absurdes
+    trs_réel = np.clip(trs_réel, 0.0, 1.5)
 
-        # Stocker les valeurs calculées
-        df.at[idx, "Tps Requis (h)"] = tps_requis_h
-        df.at[idx, "Do_Calc"] = do_réel
-        df.at[idx, "Tp_Calc"] = tp_réel
-        df.at[idx, "Tq_Calc"] = tq_réel
-        df.at[idx, "TRS_Calc"] = trs_réel
-        df.at[idx, "Do_Réel"] = do_réel
-        df.at[idx, "Tp_Réel"] = tp_réel
-        df.at[idx, "Tq_Réel"] = tq_réel
-        df.at[idx, "TRS_Réel"] = trs_réel
-        df.at[idx, "TRS_Écart"] = trs_erp - trs_réel
-        df.at[idx, "TRS_ERP_Surestime"] = (trs_erp - trs_réel) > 0.001
+    # ===== STOCKAGE VECTORISÉ =====
+    df["Tps Requis (h)"] = tps_requis_h
+    df["Do_Calc"] = do_réel
+    df["Tp_Calc"] = tp_réel
+    df["Tq_Calc"] = tq_réel
+    df["TRS_Calc"] = trs_réel
+    df["Do_Réel"] = do_réel
+    df["Tp_Réel"] = tp_réel
+    df["Tq_Réel"] = tq_réel
+    df["TRS_Réel"] = trs_réel
+    df["TRS_Écart"] = trs_erp - trs_réel
+    df["TRS_ERP_Surestime"] = (trs_erp - trs_réel) > 0.001
 
     return df
 
