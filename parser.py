@@ -2,16 +2,21 @@
 
 Ce module gère la lecture des fichiers exportés depuis l'ERP, en ignorant les
 10 premières lignes de métadonnées et en supprimant les lignes de totaux.
+Supporte le traitement par chunks pour les gros fichiers (>50k lignes).
 """
 import pandas as pd
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, BinaryIO
 import logging
 
 logger = logging.getLogger(__name__)
 
 # Nombre de lignes d'en-tête à ignorer dans les fichiers ERP
 HEADER_ROWS_TO_SKIP = 10
+
+# Seuil pour traitement par chunks (lignes)
+CHUNK_SIZE_THRESHOLD = 50000
+CHUNK_SIZE = 10000
 
 
 def parse_file(file_path: Union[str, Path]) -> pd.DataFrame:
@@ -43,6 +48,99 @@ def parse_file(file_path: Union[str, Path]) -> pd.DataFrame:
     df = _remove_total_row(df)
 
     return df
+
+
+def parse_uploaded_file(uploaded_file) -> pd.DataFrame:
+    """
+    Parse un fichier uploadé via Streamlit (InMemoryUploadedFile).
+    Supporte le traitement par chunks pour les gros fichiers.
+    
+    Args:
+        uploaded_file: Fichier uploadé via st.file_uploader()
+        
+    Returns:
+        DataFrame contenant les données nettoyées
+    """
+    file_name = uploaded_file.name
+    file_content = uploaded_file.getvalue()
+    
+    # Déterminer la taille approximative (en lignes estimées)
+    estimated_rows = len(file_content) // 200  # Estimation grossière
+    use_chunks = estimated_rows > CHUNK_SIZE_THRESHOLD
+    
+    if file_name.endswith('.xlsx'):
+        df = _parse_xlsx_from_bytes(file_content, use_chunks=use_chunks)
+    elif file_name.endswith('.csv'):
+        df = _parse_csv_from_bytes(file_content, use_chunks=use_chunks)
+    else:
+        raise ValueError(f"Format non supporté: {file_name}")
+    
+    # Supprimer les lignes de total
+    df = _remove_total_row(df)
+    
+    logger.info(f"Fichier parsé: {file_name}, {len(df)} lignes (chunks: {use_chunks})")
+    return df
+
+
+def _parse_xlsx_from_bytes(file_content: bytes, use_chunks: bool = False) -> pd.DataFrame:
+    """Parse un fichier XLSX depuis des bytes."""
+    from io import BytesIO
+    
+    buffer = BytesIO(file_content)
+    
+    if use_chunks:
+        # Lecture par chunks pour les gros fichiers
+        chunks = []
+        for chunk in pd.read_excel(
+            buffer, 
+            sheet_name='RESULTAT_EQUIPE', 
+            header=HEADER_ROWS_TO_SKIP,
+            chunksize=CHUNK_SIZE
+        ):
+            chunks.append(chunk)
+        df = pd.concat(chunks, ignore_index=True)
+    else:
+        df = pd.read_excel(buffer, sheet_name='RESULTAT_EQUIPE', header=HEADER_ROWS_TO_SKIP)
+    
+    return df
+
+
+def _parse_csv_from_bytes(file_content: bytes, use_chunks: bool = False) -> pd.DataFrame:
+    """Parse un fichier CSV depuis des bytes."""
+    from io import BytesIO, TextIOWrapper
+    
+    # Essayer UTF-8 d'abord, puis latin-1
+    for encoding in ['utf-8-sig', 'latin-1']:
+        try:
+            buffer = BytesIO(file_content)
+            text_buffer = TextIOWrapper(buffer, encoding=encoding)
+            
+            if use_chunks:
+                # Lecture par chunks
+                chunks = []
+                for chunk in pd.read_csv(
+                    text_buffer,
+                    sep=';',
+                    header=HEADER_ROWS_TO_SKIP,
+                    decimal=',',
+                    thousands=' ',
+                    chunksize=CHUNK_SIZE
+                ):
+                    chunks.append(chunk)
+                df = pd.concat(chunks, ignore_index=True)
+            else:
+                df = pd.read_csv(
+                    text_buffer,
+                    sep=';',
+                    header=HEADER_ROWS_TO_SKIP,
+                    decimal=',',
+                    thousands=' '
+                )
+            return df
+        except UnicodeDecodeError:
+            continue
+    
+    raise ValueError("Impossible de décoder le fichier avec les encodages supportés")
 
 
 def _parse_xlsx(file_path: Path) -> pd.DataFrame:

@@ -3,9 +3,9 @@ import pandas as pd
 import plotly.graph_objects as go
 from io import BytesIO
 
-from parser import parse_file, HEADER_ROWS_TO_SKIP
+from parser import parse_uploaded_file, HEADER_ROWS_TO_SKIP
 from calculator import calculate_all_metrics
-from filters import apply_filters, calculate_aggregated_kpis, calculate_monthly_trs_table, calculate_filter_stats
+from filters import apply_filters, calculate_aggregated_kpis, calculate_monthly_trs_table, calculate_filter_stats, calculate_filtered_stats
 from exporter import export_to_excel
 
 # --- 1. CONFIGURATION DE LA PAGE ---
@@ -169,7 +169,7 @@ with st.sidebar:
 @st.cache_data
 def load_and_process_files(uploaded_files_data):
     """
-    Charge et traite les fichiers uploadés.
+    Charge et traite les fichiers uploadés avec support chunks.
     Cette fonction est mise en cache pour éviter de relire les fichiers
     à chaque interaction avec les filtres.
     """
@@ -178,10 +178,17 @@ def load_and_process_files(uploaded_files_data):
         file_name = file_data['name']
         file_content = file_data['content']
         
-        if file_name.endswith('.xlsx'):
-            df = pd.read_excel(BytesIO(file_content), sheet_name='RESULTAT_EQUIPE', header=HEADER_ROWS_TO_SKIP)
-        else:
-            df = pd.read_csv(BytesIO(file_content), sep=';', header=HEADER_ROWS_TO_SKIP, decimal=',', encoding='latin-1')
+        # Utilisation de BytesIO pour simuler un fichier uploadé
+        class MockUploadedFile:
+            def __init__(self, name, content):
+                self.name = name
+                self._content = content
+            
+            def getvalue(self):
+                return self._content
+        
+        mock_file = MockUploadedFile(file_name, file_content)
+        df = parse_uploaded_file(mock_file)
         all_dfs.append(df)
 
     raw_df = pd.concat(all_dfs, ignore_index=True)
@@ -208,7 +215,7 @@ if uploaded_files:
                 'content': uploaded_file.getvalue()
             })
         
-        # B. Chargement et traitement (avec cache)
+        # B. Chargement et traitement (avec cache + parser chunks)
         processed_df = load_and_process_files(uploaded_files_data)
 
         # C. Filtres Avancés (après import)
@@ -256,10 +263,11 @@ if uploaded_files:
         # D. Filtrage et KPIs
         filtered_df = apply_filters(processed_df, filter_config)
         kpis = calculate_aggregated_kpis(filtered_df)
-        stats = calculate_filter_stats(processed_df, filter_config)
+        # Stats calculées sur les données FILTRÉES (pas sur les données brutes)
+        stats = calculate_filtered_stats(filtered_df, processed_df)
         monthly_df = calculate_monthly_trs_table(filtered_df)
 
-        # E. Stats dans sidebar
+        # E. Stats dans sidebar (actualisées selon les filtres)
         with stats_placeholder:
             st.markdown("#### Stats")
             st.text(f"Lignes totales:    {stats['total_rows']}")
