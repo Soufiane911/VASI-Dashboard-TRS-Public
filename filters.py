@@ -159,21 +159,24 @@ def calculate_filtered_stats(filtered_df: pd.DataFrame, original_df: pd.DataFram
     filtered_rows = len(filtered_df)
 
     # Compteurs sur les données FILTRÉES (actualisés selon les filtres)
-    filtered_zero_trs_count = filtered_df["is_zero_trs"].sum() if "is_zero_trs" in filtered_df.columns else 0
-    filtered_anomaly_count = filtered_df["is_anomaly"].sum() if "is_anomaly" in filtered_df.columns else 0
-    filtered_ok_count = filtered_rows - filtered_anomaly_count
+    zero_trs_count = filtered_df["is_zero_trs"].sum() if "is_zero_trs" in filtered_df.columns else 0
+    anomaly_count = filtered_df["is_anomaly"].sum() if "is_anomaly" in filtered_df.columns else 0
+    ok_count = filtered_rows - anomaly_count
+    
+    # Pourcentages (compatibilité avec streamlit_app.py)
+    ok_percentage = (ok_count / filtered_rows * 100) if filtered_rows > 0 else 0
+    anomaly_percentage = (anomaly_count / filtered_rows * 100) if filtered_rows > 0 else 0
 
     return {
         "total_rows": total_rows,
         "filtered_rows": filtered_rows,
         "excluded_rows": total_rows - filtered_rows,
-        # Stats sur données filtrées (actualisées)
-        "filtered_zero_trs_count": int(filtered_zero_trs_count),
-        "filtered_anomaly_count": int(filtered_anomaly_count),
-        "filtered_ok_count": int(filtered_ok_count),
-        # Stats sur données originales (pour référence si besoin)
-        "total_zero_trs_count": int(original_df["is_zero_trs"].sum() if "is_zero_trs" in original_df.columns else 0),
-        "total_anomaly_count": int(original_df["is_anomaly"].sum() if "is_anomaly" in original_df.columns else 0),
+        # Stats sur données filtrées (actualisées) - noms sans prefix pour compatibilité
+        "zero_trs_count": int(zero_trs_count),
+        "anomaly_count": int(anomaly_count),
+        "ok_count": int(ok_count),
+        "ok_percentage": ok_percentage,
+        "anomaly_percentage": anomaly_percentage,
     }
 
 
