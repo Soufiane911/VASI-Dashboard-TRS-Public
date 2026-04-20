@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from io import BytesIO
+import traceback
 
 from parser import parse_uploaded_file, HEADER_ROWS_TO_SKIP
 from calculator import calculate_all_metrics
@@ -358,9 +359,9 @@ if uploaded_files:
         with kpi1:
             st.markdown(create_circle_kpi(kpis['trs_erp'], "TRS ERP"), unsafe_allow_html=True)
         with kpi2:
-            st.markdown(create_circle_kpi(kpis['trs_réel'], "TRS Réel"), unsafe_allow_html=True)
+            st.markdown(create_circle_kpi(kpis['trs_reel'], "TRS Réel"), unsafe_allow_html=True)
         with kpi3:
-            st.markdown(create_circle_kpi(kpis['écart_points'], "Écart"), unsafe_allow_html=True)
+            st.markdown(create_circle_kpi(kpis['ecart_points'], "Écart"), unsafe_allow_html=True)
         with kpi4:
             active_pct = stats['ok_percentage'] / 100
             st.markdown(create_circle_kpi(active_pct, "% Lignes Actives"), unsafe_allow_html=True)
@@ -373,13 +374,13 @@ if uploaded_files:
 
         col_spacer1, c1, c2, c3, col_spacer2 = st.columns([0.3, 1, 1, 1, 0.3])
         with c1:
-            st.plotly_chart(create_ring_gauge(kpis['taux_dispo_erp'], "#0E60D7"), use_container_width=True, key="gauge_erp_dispo")
+            st.plotly_chart(create_ring_gauge(kpis['disponibilite_erp'], "#0E60D7"), use_container_width=True, key="gauge_erp_dispo")
             st.markdown("<div style='text-align:center; font-size:14px; font-weight:bold; color:#555;'>Disponibilité</div>", unsafe_allow_html=True)
         with c2:
-            st.plotly_chart(create_ring_gauge(kpis['taux_perf_erp'], "#0E60D7"), use_container_width=True, key="gauge_erp_perf")
+            st.plotly_chart(create_ring_gauge(kpis['performance_erp'], "#0E60D7"), use_container_width=True, key="gauge_erp_perf")
             st.markdown("<div style='text-align:center; font-size:14px; font-weight:bold; color:#555;'>Performance</div>", unsafe_allow_html=True)
         with c3:
-            st.plotly_chart(create_ring_gauge(kpis['taux_qualite_erp'], "#0E60D7"), use_container_width=True, key="gauge_erp_qualite")
+            st.plotly_chart(create_ring_gauge(kpis['qualite_erp'], "#0E60D7"), use_container_width=True, key="gauge_erp_qualite")
             st.markdown("<div style='text-align:center; font-size:14px; font-weight:bold; color:#555;'>Qualité</div>", unsafe_allow_html=True)
 
         # SECTION TAUX RÉELS (Calculés)
@@ -387,17 +388,17 @@ if uploaded_files:
 
         col_spacer1, c1, c2, c3, col_spacer2 = st.columns([0.3, 1, 1, 1, 0.3])
         with c1:
-            st.plotly_chart(create_ring_gauge(kpis['taux_dispo_réel'], "#0E60D7"), use_container_width=True, key="gauge_reel_dispo")
+            st.plotly_chart(create_ring_gauge(kpis['disponibilite_reel'], "#0E60D7"), use_container_width=True, key="gauge_reel_dispo")
             st.markdown("<div style='text-align:center; font-size:14px; font-weight:bold; color:#555;'>Disponibilité</div>", unsafe_allow_html=True)
         with c2:
-            st.plotly_chart(create_ring_gauge(kpis['taux_perf_réel'], "#0E60D7"), use_container_width=True, key="gauge_reel_perf")
+            st.plotly_chart(create_ring_gauge(kpis['performance_reel'], "#0E60D7"), use_container_width=True, key="gauge_reel_perf")
             st.markdown("<div style='text-align:center; font-size:14px; font-weight:bold; color:#555;'>Performance</div>", unsafe_allow_html=True)
         with c3:
-            st.plotly_chart(create_ring_gauge(kpis['taux_qualite_réel'], "#0E60D7"), use_container_width=True, key="gauge_reel_qualite")
+            st.plotly_chart(create_ring_gauge(kpis['qualite_reel'], "#0E60D7"), use_container_width=True, key="gauge_reel_qualite")
             st.markdown("<div style='text-align:center; font-size:14px; font-weight:bold; color:#555;'>Qualité</div>", unsafe_allow_html=True)
 
         # GRAPHIQUE
-        st.markdown(f'<div class="section-title">Évolution TRS par Mois | Global: ERP {kpis["trs_erp"]*100:.1f}% - Réel {kpis["trs_réel"]*100:.1f}%</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">Évolution TRS par Mois | Global: ERP {kpis["trs_erp"]*100:.1f}% - Réel {kpis["trs_reel"]*100:.1f}%</div>', unsafe_allow_html=True)
 
         if not monthly_df.empty:
             fig = go.Figure()
@@ -460,8 +461,9 @@ if uploaded_files:
         )
 
     except Exception as e:
-        st.error(f"Erreur d'analyse : {e}")
-        st.code(str(e))
+        st.error(f"Erreur de traitement : {e}")
+        with st.expander("Détails techniques"):
+            st.code(traceback.format_exc())
 
 else:
     # Ecran d'accueil vide

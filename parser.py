@@ -87,22 +87,11 @@ def _parse_xlsx_from_bytes(file_content: bytes, use_chunks: bool = False) -> pd.
     from io import BytesIO
     
     buffer = BytesIO(file_content)
-    
-    if use_chunks:
-        # Lecture par chunks pour les gros fichiers
-        chunks = []
-        for chunk in pd.read_excel(
-            buffer, 
-            sheet_name='RESULTAT_EQUIPE', 
-            header=HEADER_ROWS_TO_SKIP,
-            chunksize=CHUNK_SIZE
-        ):
-            chunks.append(chunk)
-        df = pd.concat(chunks, ignore_index=True)
-    else:
-        df = pd.read_excel(buffer, sheet_name='RESULTAT_EQUIPE', header=HEADER_ROWS_TO_SKIP)
-    
-    return df
+
+    # NOTE: pandas ne supporte pas le streaming/chunks natif pour read_excel.
+    # On garde l'argument use_chunks pour compatibilité d'API, mais la lecture
+    # reste en un seul passage pour éviter des erreurs de concaténation.
+    return pd.read_excel(buffer, sheet_name='RESULTAT_EQUIPE', header=HEADER_ROWS_TO_SKIP)
 
 
 def _parse_csv_from_bytes(file_content: bytes, use_chunks: bool = False) -> pd.DataFrame:

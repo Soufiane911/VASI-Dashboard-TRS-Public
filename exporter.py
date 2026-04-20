@@ -175,16 +175,26 @@ def export_to_excel(
         calc_cols = ['Do_Calc', 'Tp_Calc', 'Tq_Calc', 'TRS_Calc', 'TRS_Écart']
         meta_cols = ['is_anomaly', 'anomalies']
 
-        final_cols = (erp_cols +
-                     [c for c in calc_cols if c in filtered_df.columns] +
-                     [c for c in meta_cols if c in filtered_df.columns])
+        # Éviter les doublons de colonnes (ex: 'anomalies' déjà présent dans erp_cols)
+        final_cols = list(dict.fromkeys(
+            erp_cols +
+            [c for c in calc_cols if c in filtered_df.columns] +
+            [c for c in meta_cols if c in filtered_df.columns]
+        ))
 
         data_df = filtered_df[final_cols].copy()
 
         if "anomalies" in data_df.columns:
-            data_df["anomalies"] = data_df["anomalies"].apply(
-                lambda x: ", ".join(x) if isinstance(x, list) else str(x)
-            )
+            def _format_anomalies(value) -> str:
+                if isinstance(value, list):
+                    return ", ".join(str(v) for v in value)
+                if pd.isna(value):
+                    return ""
+                return str(value)
+
+            # Utiliser map sur une Series garantie (plus robuste qu'un apply ambigu
+            # en présence éventuelle de colonnes dupliquées)
+            data_df["anomalies"] = pd.Series(data_df["anomalies"], index=data_df.index).map(_format_anomalies)
 
         data_df.to_excel(writer, sheet_name="Données_Audit", index=False)
         ws_data = writer.sheets["Données_Audit"]

@@ -1,4 +1,5 @@
 """Module de filtrage des données avec mise à jour temps réel."""
+
 import pandas as pd
 from dataclasses import dataclass, field
 from typing import Callable
@@ -72,28 +73,41 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     min_trs = filters.get("min_trs", 0.0)
     max_trs = filters.get("max_trs", 2.0)
     if "TRS_Calc" in result.columns:
-        result = result[(result["TRS_Calc"] >= min_trs) & (result["TRS_Calc"] <= max_trs)]
+        result = result[
+            (result["TRS_Calc"] >= min_trs) & (result["TRS_Calc"] <= max_trs)
+        ]
 
     # Filtres avancés: plage Performance
     min_perf = filters.get("min_performance", 0.0)
     max_perf = filters.get("max_performance", 2.5)
     if "Tp_Calc" in result.columns:
-        result = result[(result["Tp_Calc"] >= min_perf) & (result["Tp_Calc"] <= max_perf)]
+        result = result[
+            (result["Tp_Calc"] >= min_perf) & (result["Tp_Calc"] <= max_perf)
+        ]
 
     # Filtres avancés: machines spécifiques
     machines = filters.get("machines", [])
 
     def _match_val(val, selected):
-        if pd.isna(val) or selected is None: return False
+        if pd.isna(val) or selected is None:
+            return False
         try:
             v_str = str(int(float(val))) if float(val).is_integer() else str(val)
-            s_str = str(int(float(selected))) if float(selected).is_integer() else str(selected)
+            s_str = (
+                str(int(float(selected)))
+                if float(selected).is_integer()
+                else str(selected)
+            )
             return v_str == s_str
         except:
             return str(val) == str(selected)
 
     if machines and "Réf. Machine" in result.columns:
-        result = result[result["Réf. Machine"].apply(lambda x: any(_match_val(x, m) for m in machines))]
+        result = result[
+            result["Réf. Machine"].apply(
+                lambda x: any(_match_val(x, m) for m in machines)
+            )
+        ]
 
     # ===== NOUVEAUX FILTRES DROPDOWN =====
     # Filtre Mois
@@ -103,18 +117,36 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
 
     # Filtre Presse
     presse_selected = filters.get("presse_selected")
-    if presse_selected and presse_selected != "Toutes" and "Réf. Machine" in result.columns:
-        result = result[result["Réf. Machine"].apply(lambda x: _match_val(x, presse_selected))]
+    if (
+        presse_selected
+        and presse_selected != "Toutes"
+        and "Réf. Machine" in result.columns
+    ):
+        result = result[
+            result["Réf. Machine"].apply(lambda x: _match_val(x, presse_selected))
+        ]
 
     # Filtre Outillage
     outillage_selected = filters.get("outillage_selected")
-    if outillage_selected and outillage_selected != "Tous" and "Réf. outil" in result.columns:
-        result = result[result["Réf. outil"].apply(lambda x: _match_val(x, outillage_selected))]
+    if (
+        outillage_selected
+        and outillage_selected != "Tous"
+        and "Réf. outil" in result.columns
+    ):
+        result = result[
+            result["Réf. outil"].apply(lambda x: _match_val(x, outillage_selected))
+        ]
 
     # Filtre Pièce
     piece_selected = filters.get("piece_selected")
-    if piece_selected and piece_selected != "Toutes" and "Réf. produit" in result.columns:
-        result = result[result["Réf. produit"].apply(lambda x: _match_val(x, piece_selected))]
+    if (
+        piece_selected
+        and piece_selected != "Toutes"
+        and "Réf. produit" in result.columns
+    ):
+        result = result[
+            result["Réf. produit"].apply(lambda x: _match_val(x, piece_selected))
+        ]
 
     return result
 
@@ -138,19 +170,23 @@ def calculate_filter_stats(df: pd.DataFrame, filters: dict) -> dict:
         "anomaly_count": int(anomaly_count),
         "ok_count": int(ok_count),
         "ok_percentage": (ok_count / total_rows * 100) if total_rows > 0 else 0,
-        "anomaly_percentage": (anomaly_count / total_rows * 100) if total_rows > 0 else 0,
+        "anomaly_percentage": (anomaly_count / total_rows * 100)
+        if total_rows > 0
+        else 0,
     }
 
 
-def calculate_filtered_stats(filtered_df: pd.DataFrame, original_df: pd.DataFrame) -> dict:
+def calculate_filtered_stats(
+    filtered_df: pd.DataFrame, original_df: pd.DataFrame
+) -> dict:
     """
     Calcule les statistiques sur les données FILTRÉES.
     Présentation simple: Actives / À 0 / Anomalies
-    
+
     Args:
         filtered_df: DataFrame après application des filtres
         original_df: DataFrame original avant filtrage
-        
+
     Returns:
         dict avec les statistiques actualisées selon les filtres
     """
@@ -158,9 +194,13 @@ def calculate_filtered_stats(filtered_df: pd.DataFrame, original_df: pd.DataFram
     filtered_rows = len(filtered_df)
 
     # Compteurs sur les données FILTRÉES (actualisés selon les filtres)
-    zero_trs_count = int(filtered_df["is_zero_trs"].sum() if "is_zero_trs" in filtered_df.columns else 0)
-    anomaly_count = int(filtered_df["is_anomaly"].sum() if "is_anomaly" in filtered_df.columns else 0)
-    
+    zero_trs_count = int(
+        filtered_df["is_zero_trs"].sum() if "is_zero_trs" in filtered_df.columns else 0
+    )
+    anomaly_count = int(
+        filtered_df["is_anomaly"].sum() if "is_anomaly" in filtered_df.columns else 0
+    )
+
     # Lignes actives = TRS > 0 (exclut les lignes à 0)
     active_count = filtered_rows - zero_trs_count
 
@@ -169,12 +209,16 @@ def calculate_filtered_stats(filtered_df: pd.DataFrame, original_df: pd.DataFram
         "filtered_rows": filtered_rows,
         "excluded_rows": total_rows - filtered_rows,
         # Stats sur données filtrées (présentation simple)
-        "active_count": active_count,           # Lignes avec TRS > 0
-        "zero_trs_count": zero_trs_count,       # Lignes avec TRS = 0
-        "anomaly_count": anomaly_count,         # Lignes avec anomalies
+        "active_count": active_count,  # Lignes avec TRS > 0
+        "zero_trs_count": zero_trs_count,  # Lignes avec TRS = 0
+        "anomaly_count": anomaly_count,  # Lignes avec anomalies
         # Pourcentages pour les KPIs circulaires
-        "ok_percentage": (active_count / filtered_rows * 100) if filtered_rows > 0 else 0,
-        "anomaly_percentage": (anomaly_count / filtered_rows * 100) if filtered_rows > 0 else 0,
+        "ok_percentage": (active_count / filtered_rows * 100)
+        if filtered_rows > 0
+        else 0,
+        "anomaly_percentage": (anomaly_count / filtered_rows * 100)
+        if filtered_rows > 0
+        else 0,
     }
 
 
@@ -187,18 +231,26 @@ def calculate_monthly_trs_table(df: pd.DataFrame) -> pd.DataFrame:
 
     for mois, group in df.groupby("Mois"):
         # ===== TRS ERP (exclut zéros) =====
-        if 'Tps Fct Brut (h)' in group.columns and 'T.R.S.' in group.columns:
+        if "Tps Fct Brut (h)" in group.columns and "T.R.S." in group.columns:
             group_prod = group[
-                (group['Tps Fct Brut (h)'].fillna(0) > 0) |
-                (group['T.R.S.'].fillna(0) > 0)
+                (group["Tps Fct Brut (h)"].fillna(0) > 0)
+                | (group["T.R.S."].fillna(0) > 0)
             ]
-            trs_erp = group_prod['T.R.S.'].mean() if len(group_prod) > 0 else 0.0
+            trs_erp = group_prod["T.R.S."].mean() if len(group_prod) > 0 else 0.0
         else:
             trs_erp = group["T.R.S."].mean() if "T.R.S." in group.columns else 0.0
 
         # ===== TRS Réel (NF E60-182) =====
-        total_tps_dispo = group['Tps Disponible (h)'].fillna(0).sum() if 'Tps Disponible (h)' in group.columns else 0.0
-        total_tps_utile = group['Tps Utile (h)'].fillna(0).sum() if 'Tps Utile (h)' in group.columns else 0.0
+        total_tps_dispo = (
+            group["Tps Disponible (h)"].fillna(0).sum()
+            if "Tps Disponible (h)" in group.columns
+            else 0.0
+        )
+        total_tps_utile = (
+            group["Tps Utile (h)"].fillna(0).sum()
+            if "Tps Utile (h)" in group.columns
+            else 0.0
+        )
 
         if total_tps_dispo > 0:
             trs_reel = total_tps_utile / total_tps_dispo
@@ -209,13 +261,15 @@ def calculate_monthly_trs_table(df: pd.DataFrame) -> pd.DataFrame:
         ecart = trs_erp - trs_reel
         ecart_pct = (ecart / trs_reel * 100) if trs_reel > 0 else 0.0
 
-        results.append({
-            "Mois": mois,
-            "TRS_Réel": trs_reel,
-            "TRS_ERP": trs_erp,
-            "Écart": ecart,
-            "Écart_%": ecart_pct,
-        })
+        results.append(
+            {
+                "Mois": mois,
+                "TRS_Réel": trs_reel,
+                "TRS_ERP": trs_erp,
+                "Écart": ecart,
+                "Écart_%": ecart_pct,
+            }
+        )
 
     return pd.DataFrame(results).sort_values("Mois")
 
@@ -258,9 +312,9 @@ def calculate_aggregated_kpis(df: pd.DataFrame) -> dict:
     taux_qualite_calc = df["Tq_Calc"].mean() if "Tq_Calc" in df.columns else 0.0
 
     # ===== TAUX ERP =====
-    taux_dispo_erp = audit_results['do_erp']
-    taux_perf_erp = audit_results['tp_erp']
-    taux_qualite_erp = audit_results['tq_erp']
+    taux_dispo_erp = audit_results["do_erp"]
+    taux_perf_erp = audit_results["tp_erp"]
+    taux_qualite_erp = audit_results["tq_erp"]
 
     # ===== TRS CALCULÉ (pondéré) =====
     if "TRS_Calc" in df.columns and len(df) > 0:
@@ -273,35 +327,33 @@ def calculate_aggregated_kpis(df: pd.DataFrame) -> dict:
         trs_calc = 0.0
 
     return {
-        # TRS Principal (Audit)
-        "trs_erp": audit_results['trs_erp'],
-        "trs_réel": audit_results['trs_réel'],
+        # TRS Principal (Audit) - normalized names for frontend
+        "trs_erp": audit_results["trs_erp"],
+        "trs_reel": audit_results["trs_réel"],
         "trs_calc": trs_calc,
-
-        # Écarts
-        "écart_points": audit_results['écart_points'],
-        "écart_pourcentage": audit_results['écart_pct'],
-
-        # Composantes Réelles (Audit global)
-        "taux_dispo_réel": audit_results['do_réel'],
-        "taux_perf_réel": audit_results['tp_réel'],
-        "taux_qualite_réel": audit_results['tq_réel'],
-
+        # Écarts - normalized name
+        "ecart_points": audit_results["écart_points"],
+        "écart_pourcentage": audit_results["écart_pct"],
+        # Disponibilité - normalized names
+        "disponibilite_erp": taux_dispo_erp,
+        "disponibilite_reel": audit_results["do_réel"],
+        # Performance - normalized names
+        "performance_erp": taux_perf_erp,
+        "performance_reel": audit_results["tp_réel"],
+        # Qualité - normalized names
+        "qualite_erp": taux_qualite_erp,
+        "qualite_reel": audit_results["tq_réel"],
+        # Lignes actives/NOK percentages
+        "pct_actives": audit_results.get("pct_lignes_actives", 0),
+        "pct_nok": audit_results.get("pct_lignes_nok", 0),
         # Composantes Calculées (moyennes)
         "taux_dispo_calc": taux_dispo_calc,
         "taux_perf_calc": taux_perf_calc,
         "taux_qualite_calc": taux_qualite_calc,
-
-        # Composantes ERP
-        "taux_dispo_erp": taux_dispo_erp,
-        "taux_perf_erp": taux_perf_erp,
-        "taux_qualite_erp": taux_qualite_erp,
-
         # Statistiques d'audit
-        "lignes_production": audit_results['lignes_production'],
-        "lignes_totales": audit_results['lignes_totales'],
-        "lignes_zéro": audit_results['lignes_zéro'],
-
+        "lignes_production": audit_results["lignes_production"],
+        "lignes_totales": audit_results["lignes_totales"],
+        "lignes_zéro": audit_results["lignes_zéro"],
         # Rétrocompatibilité
-        "delta_trs": audit_results['écart_points'],
+        "delta_trs": audit_results["écart_points"],
     }
